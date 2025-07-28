@@ -1,4 +1,5 @@
 use gphoto2::Error;
+use gphoto2::file;
 use gphoto2::list;
 use log::trace;
 use std::collections::HashMap;
@@ -81,6 +82,23 @@ impl Camera {
             files: files,
             folders: folders,
         })
+    }
+
+    pub fn get_file(&self, folder: &str, file: &str) -> Result<File, Error> {
+        let fs = self.inner.fs();
+        let file = fs.download(folder, file).wait()?;
+
+        Ok(File { inner: file })
+    }
+}
+
+pub struct File {
+    inner: file::CameraFile,
+}
+
+impl File {
+    pub fn get_filename(&self) -> String {
+        self.inner.name()
     }
 }
 

@@ -1,28 +1,5 @@
-use anyhow::Result;
 use gphoto2::filesys;
 use std::collections::HashMap;
-
-pub fn find_matches(content: &str, pattern: &str, mut writer: impl std::io::Write) -> Result<()> {
-    if content.contains(pattern) {
-        writeln!(writer, "{}", content)?;
-    };
-
-    Ok(())
-}
-
-#[test]
-fn find_a_match() {
-    let mut result = Vec::new();
-    let _ = find_matches("lorem ipsum", "lorem", &mut result);
-    assert_eq!(result, b"lorem ipsum\n");
-}
-
-#[test]
-fn dont_find_a_match() {
-    let mut result: Vec<u8> = Vec::new();
-    let _ = find_matches("lorem ipsum", "loreal", &mut result);
-    assert_eq!(result, b"");
-}
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -31,7 +8,23 @@ pub struct FolderContent {
     files: Vec<String>,
 }
 
-pub fn list_directory_recursive(
+impl std::fmt::Display for FolderContent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (name, fc) in &self.folders {
+            write!(f, "{}/\n", name).expect("invalid folder");
+            let _ = fc.fmt(f);
+        }
+        if self.files.len() > 0 {
+            for file in &self.files {
+                write!(f, "-{}\n", file).expect("invalid filename");
+            }
+        }
+
+        Ok(())
+    }
+}
+
+pub fn list_folders_recursive(
     fs: &filesys::CameraFS,
     dir_name: &str,
 ) -> gphoto2::Result<FolderContent> {
@@ -40,7 +33,7 @@ pub fn list_directory_recursive(
 
     for folder in folders_iter {
         let folder_full_name = format!("{}/{folder}", if dir_name == "/" { "" } else { dir_name });
-        folders.insert(folder, list_directory_recursive(fs, &folder_full_name)?);
+        folders.insert(folder, list_folders_recursive(fs, &folder_full_name)?);
     }
 
     let files = fs.list_files(dir_name).wait()?.collect();

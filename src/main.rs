@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use gphoto2::list;
 use log::{info, trace};
 use std::io::prelude::*;
 use std::io::{self};
@@ -10,6 +11,21 @@ use std::sync::atomic::{AtomicBool, Ordering};
 struct Cli {
     #[command(flatten)]
     verbosity: clap_verbosity_flag::Verbosity,
+}
+
+#[derive(Debug)]
+struct Camera {
+    descriptor: list::CameraDescriptor,
+}
+
+impl std::fmt::Display for Camera {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} on port {}",
+            self.descriptor.model, self.descriptor.port
+        )
+    }
 }
 
 fn main() -> Result<()> {
@@ -30,30 +46,28 @@ fn main() -> Result<()> {
 
     trace!("environment initialized");
 
-    // let ctx = gphoto2::Context::new()?;
-    // TODO: add the descriptors to a list so we can choose what camera to perform the operations
-    // on
-    // for gphoto2::list::CameraDescriptor { model, port } in ctx.list_cameras().wait()? {
-    //     // writeln!(stdout_handle, "{} on port {}", model, port)?;
-    //     info!("{} on port {}", model, port);
-    // }
+    let ctx = gphoto2::Context::new()?;
+    let mut cameras: Vec<Camera> = vec![];
+    for cd in ctx.list_cameras().wait()? {
+        trace!("detected {} on port {}", cd.model, cd.port);
+        cameras.push(Camera { descriptor: cd });
+    }
 
-    // let paths = std::fs::read_dir(&args.path)
-    //     .with_context(|| format!("could not read path`{}`", args.path.display()))?;
+    let selected_camera = inquire::Select::new("Choose a camera:", cameras).prompt()?;
 
     let camera = gphoto2::Context::new()?
-        .autodetect_camera()
+        .get_camera(&selected_camera.descriptor)
         .wait()
-        .with_context(|| format!("could not autodecetct camera"))?;
+        .with_context(|| format!("could not get selected camera"))?;
 
     info!("autoselected camera summary:\n{}", camera.summary()?);
     info!("selected port: {}", camera.port_info()?.path());
 
     let camera_fs = camera.fs();
 
-    let folders = prip::list_directory_recursive(&camera_fs, "/");
+    let folders = prip::list_folders_recursive(&camera_fs, "/")?;
 
-    writeln!(stdout_handle, "{:?}", folders)?;
+    writeln!(stdout_handle, "{}", folders)?;
     stdout_handle.flush()?;
 
     // TODO: add progress bar back in

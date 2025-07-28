@@ -2,8 +2,6 @@ use gphoto2::filesys;
 use gphoto2::list;
 use std::collections::HashMap;
 
-#[derive(Debug)]
-#[allow(dead_code)]
 pub struct Camera {
     descriptor: list::CameraDescriptor,
 }
@@ -27,8 +25,6 @@ impl std::fmt::Display for Camera {
     }
 }
 
-#[derive(Debug)]
-#[allow(dead_code)]
 pub struct FolderContent {
     folders: HashMap<String, FolderContent>,
     files: Vec<String>,

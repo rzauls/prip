@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use gphoto2::list;
 use log::{info, trace};
 use std::io::prelude::*;
 use std::io::{self};
@@ -11,21 +10,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 struct Cli {
     #[command(flatten)]
     verbosity: clap_verbosity_flag::Verbosity,
-}
-
-#[derive(Debug)]
-struct Camera {
-    descriptor: list::CameraDescriptor,
-}
-
-impl std::fmt::Display for Camera {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} on port {}",
-            self.descriptor.model, self.descriptor.port
-        )
-    }
 }
 
 fn main() -> Result<()> {
@@ -47,16 +31,16 @@ fn main() -> Result<()> {
     trace!("environment initialized");
 
     let ctx = gphoto2::Context::new()?;
-    let mut cameras: Vec<Camera> = vec![];
+    let mut cameras: Vec<prip::Camera> = vec![];
     for cd in ctx.list_cameras().wait()? {
         trace!("detected {} on port {}", cd.model, cd.port);
-        cameras.push(Camera { descriptor: cd });
+        cameras.push(prip::Camera::new(cd));
     }
 
     let selected_camera = inquire::Select::new("Choose a camera:", cameras).prompt()?;
 
     let camera = gphoto2::Context::new()?
-        .get_camera(&selected_camera.descriptor)
+        .get_camera(&selected_camera.descriptor())
         .wait()
         .with_context(|| format!("could not get selected camera"))?;
 

@@ -1,5 +1,31 @@
 use gphoto2::filesys;
+use gphoto2::list;
 use std::collections::HashMap;
+
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct Camera {
+    descriptor: list::CameraDescriptor,
+}
+
+impl Camera {
+    pub fn new(dc: list::CameraDescriptor) -> Camera {
+        Camera { descriptor: dc }
+    }
+    pub fn descriptor(self) -> list::CameraDescriptor {
+        self.descriptor
+    }
+}
+
+impl std::fmt::Display for Camera {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} on port {}",
+            self.descriptor.model, self.descriptor.port
+        )
+    }
+}
 
 #[derive(Debug)]
 #[allow(dead_code)]

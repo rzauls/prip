@@ -1,26 +1,22 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use log::{info, warn};
+use log::{info, trace};
 use std::io::prelude::*;
-use std::io::{self, BufRead};
+use std::io::{self};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread::sleep;
 
 #[derive(Parser)]
 struct Cli {
-    pattern: String,
-    path: std::path::PathBuf,
     #[command(flatten)]
     verbosity: clap_verbosity_flag::Verbosity,
 }
 
 fn main() -> Result<()> {
-    // interrupt handler
-    let should_continue = Arc::new(AtomicBool::new(true));
-    let ctrlc_should_continue = should_continue.clone();
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
     ctrlc::set_handler(move || {
-        ctrlc_should_continue.swap(false, Ordering::SeqCst);
+        r.store(false, Ordering::SeqCst);
     })?;
 
     let args = Cli::parse();
@@ -28,45 +24,51 @@ fn main() -> Result<()> {
     env_logger::Builder::new()
         .filter_level(args.verbosity.into())
         .init();
-    info!("starting up");
-
-    let f = std::fs::File::open(&args.path)
-        .with_context(|| format!("could not read file `{}`", args.path.display()))?;
-    let reader = std::io::BufReader::new(f);
 
     let stdout = io::stdout();
     let mut stdout_handle = io::BufWriter::new(stdout.lock());
 
-    for l in reader.lines() {
-        if !should_continue.load(Ordering::SeqCst) {
-            break;
-        }
+    trace!("environment initialized");
 
-        match l {
-            Ok(line_content) => {
-                prip::find_matches(&line_content, &args.pattern, &mut stdout_handle)?;
-            }
-            Err(error) => {
-                eprintln!("Error: {}", error);
-            }
-        }
-    }
+    // let ctx = gphoto2::Context::new()?;
+    // TODO: add the descriptors to a list so we can choose what camera to perform the operations
+    // on
+    // for gphoto2::list::CameraDescriptor { model, port } in ctx.list_cameras().wait()? {
+    //     // writeln!(stdout_handle, "{} on port {}", model, port)?;
+    //     info!("{} on port {}", model, port);
+    // }
+
+    // let paths = std::fs::read_dir(&args.path)
+    //     .with_context(|| format!("could not read path`{}`", args.path.display()))?;
+
+    let camera = gphoto2::Context::new()?
+        .autodetect_camera()
+        .wait()
+        .with_context(|| format!("could not autodecetct camera"))?;
+
+    info!("autoselected camera summary:\n{}", camera.summary()?);
+    info!("selected port: {}", camera.port_info()?.path());
+
+    let camera_fs = camera.fs();
+
+    let folders = prip::list_directory_recursive(&camera_fs, "/");
+
+    writeln!(stdout_handle, "{:?}", folders)?;
     stdout_handle.flush()?;
 
-    let pb = indicatif::ProgressBar::new(100);
-    for i in 0..100 {
-        pb.println(format!("[+] finished #{}", i));
-        pb.inc(1);
-        if !should_continue.load(Ordering::SeqCst) {
-            break;
-        }
-        sleep(std::time::Duration::from_millis(5));
-    }
-    pb.finish_with_message("done");
-    Ok(())
-}
+    // TODO: add progress bar back in
+    // TODO: check https://github.com/maxicarlos08/gphoto2-rs/blob/main/examples/camera_progress.rs
+    // for progress with camera interactions
 
-#[test]
-fn check_if_the_world_exists() {
-    assert_eq!("world", "world");
+    // let pb = indicatif::ProgressBar::new(100);
+    // for i in 0..100 {
+    //     if !running.load(Ordering::SeqCst) {
+    //         break;
+    //     }
+    //     pb.println(format!("[+] finished #{}", i));
+    //     pb.inc(1);
+    //     sleep(std::time::Duration::from_millis(5));
+    // }
+    // pb.finish_with_message("done");
+    Ok(())
 }

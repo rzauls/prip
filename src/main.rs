@@ -1,8 +1,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use log::{info, warn};
-use std::io::BufRead;
-use std::io::{self, Write};
+use std::io::{self, BufRead};
 use std::thread::sleep;
 
 #[derive(Parser)]
@@ -31,9 +30,7 @@ fn main() -> Result<()> {
     for l in reader.lines() {
         match l {
             Ok(line_content) => {
-                if line_content.contains(&args.pattern) {
-                    writeln!(stdout_handle, "{}", line_content)?;
-                };
+                find_matches(&line_content, &args.pattern, &mut stdout_handle)?;
             }
             Err(error) => {
                 eprintln!("Error: {}", error);
@@ -50,4 +47,31 @@ fn main() -> Result<()> {
     pb.finish_with_message("done");
     warn!("app not done yet");
     Ok(())
+}
+
+fn find_matches(content: &str, pattern: &str, mut writer: impl std::io::Write) -> Result<()> {
+    if content.contains(pattern) {
+        writeln!(writer, "{}", content)?;
+    };
+
+    Ok(())
+}
+
+#[test]
+fn check_if_the_world_exists() {
+    assert_eq!("world", "world");
+}
+
+#[test]
+fn find_a_match() {
+    let mut result = Vec::new();
+    let _ = find_matches("lorem ipsum", "lorem", &mut result);
+    assert_eq!(result, b"lorem ipsum\n");
+}
+
+#[test]
+fn dont_find_a_match() {
+    let mut result: Vec<u8> = Vec::new();
+    let _ = find_matches("lorem ipsum", "loreal", &mut result);
+    assert_eq!(result, b"");
 }

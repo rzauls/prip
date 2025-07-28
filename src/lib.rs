@@ -3,6 +3,8 @@ use gphoto2::list;
 use log::trace;
 use std::collections::HashMap;
 
+// TODO: wrap the gphoto2 errors with our own to detach from gphoto2 platform dependencies
+
 pub struct Context {
     inner: gphoto2::Context,
 }

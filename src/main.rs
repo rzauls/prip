@@ -32,18 +32,20 @@ fn main() -> Result<()> {
 
     let ctx = prip::Context::new()?;
 
-    let cameras = ctx.list_cameras()?;
+    let cameras = ctx
+        .list_cameras()
+        .with_context(|| format!("could not list attached camera devices"))?;
 
-    let selected_camera = inquire::Select::new("Choose a camera:", cameras).prompt()?;
+    let selected_camera_descriptor = inquire::Select::new("Choose a camera:", cameras).prompt()?;
 
     let camera = ctx
-        .get_camera(selected_camera)
+        .get_camera(selected_camera_descriptor)
         .with_context(|| format!("could not fetch the selected camera"))?;
 
-    trace!("selected camera summary:\n{}", camera.summary()?);
-    trace!("selected port: {}", camera.port_info()?.path());
+    trace!("selected camera summary:\n{}", camera.get_summary()?);
+    trace!("selected port: {}", camera.get_port()?);
 
-    let folders = prip::list_folders_recursive(&camera, "/")?;
+    let folders = camera.get_folders("/")?;
 
     writeln!(stdout_handle, "{}", folders)?;
     stdout_handle.flush()?;

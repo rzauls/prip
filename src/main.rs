@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use log::{info, trace};
+use log::trace;
 use std::io::prelude::*;
 use std::io::{self};
 use std::sync::Arc;
@@ -30,26 +30,20 @@ fn main() -> Result<()> {
 
     trace!("environment initialized");
 
-    let ctx = gphoto2::Context::new()?;
-    let mut cameras: Vec<prip::Camera> = vec![];
-    for cd in ctx.list_cameras().wait()? {
-        trace!("detected {} on port {}", cd.model, cd.port);
-        cameras.push(prip::Camera::new(cd));
-    }
+    let ctx = prip::Context::new()?;
+
+    let cameras = ctx.list_cameras()?;
 
     let selected_camera = inquire::Select::new("Choose a camera:", cameras).prompt()?;
 
-    let camera = gphoto2::Context::new()?
-        .get_camera(&selected_camera.descriptor())
-        .wait()
-        .with_context(|| format!("could not get selected camera"))?;
+    let camera = ctx
+        .get_camera(selected_camera)
+        .with_context(|| format!("could not fetch the selected camera"))?;
 
-    info!("autoselected camera summary:\n{}", camera.summary()?);
-    info!("selected port: {}", camera.port_info()?.path());
+    trace!("selected camera summary:\n{}", camera.summary()?);
+    trace!("selected port: {}", camera.port_info()?.path());
 
-    let camera_fs = camera.fs();
-
-    let folders = prip::list_folders_recursive(&camera_fs, "/")?;
+    let folders = prip::list_folders_recursive(&camera, "/")?;
 
     writeln!(stdout_handle, "{}", folders)?;
     stdout_handle.flush()?;

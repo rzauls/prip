@@ -1,6 +1,32 @@
-use gphoto2::filesys;
+use gphoto2::Error;
 use gphoto2::list;
+use log::trace;
 use std::collections::HashMap;
+
+pub struct Context {
+    inner: gphoto2::Context,
+}
+
+impl Context {
+    pub fn new() -> Result<Self, Error> {
+        let ctx = gphoto2::Context::new()?;
+        Ok(Context { inner: ctx })
+    }
+
+    pub fn list_cameras(&self) -> Result<Vec<Camera>, Error> {
+        let mut cameras: Vec<Camera> = vec![];
+        for cd in self.inner.list_cameras().wait()? {
+            trace!("detected {} on port {}", cd.model, cd.port);
+            cameras.push(Camera::new(cd));
+        }
+
+        Ok(cameras)
+    }
+
+    pub fn get_camera(self, descriptor: Camera) -> Result<gphoto2::Camera, Error> {
+        self.inner.get_camera(&descriptor.descriptor()).wait()
+    }
+}
 
 pub struct Camera {
     descriptor: list::CameraDescriptor,
@@ -47,18 +73,20 @@ impl std::fmt::Display for FolderContent {
 }
 
 pub fn list_folders_recursive(
-    fs: &filesys::CameraFS,
-    dir_name: &str,
-) -> gphoto2::Result<FolderContent> {
-    let folders_iter = fs.list_folders(dir_name).wait()?;
+    camera: &gphoto2::Camera,
+    root_name: &str,
+) -> Result<FolderContent, Error> {
+    let fs = camera.fs();
+    let folders_iter = fs.list_folders(root_name).wait()?;
     let mut folders = HashMap::with_capacity(folders_iter.len());
 
     for folder in folders_iter {
-        let folder_full_name = format!("{}/{folder}", if dir_name == "/" { "" } else { dir_name });
-        folders.insert(folder, list_folders_recursive(fs, &folder_full_name)?);
+        let folder_full_name =
+            format!("{}/{folder}", if root_name == "/" { "" } else { root_name });
+        folders.insert(folder, list_folders_recursive(camera, &folder_full_name)?);
     }
 
-    let files = fs.list_files(dir_name).wait()?.collect();
+    let files = fs.list_files(root_name).wait()?.collect();
 
     Ok(FolderContent {
         files: files,

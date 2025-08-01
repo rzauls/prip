@@ -85,6 +85,7 @@ impl Camera {
             );
         }
 
+        // add progress counter without having to use INFO verbosity level
         for file in fs.list_files(root_name).wait()? {
             let output_dir = output_dir_root.join(&file);
             info!(
@@ -97,27 +98,6 @@ impl Camera {
             if delete_after_copy {
                 fs.delete_file(root_name, &file).wait()?;
                 info!("deleted `{}` from `{}`", &file, root_name);
-            }
-        }
-
-        Ok(())
-    }
-}
-
-pub struct FolderContent {
-    folders: HashMap<String, FolderContent>,
-    files: Vec<String>,
-}
-
-impl std::fmt::Display for FolderContent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (name, fc) in &self.folders {
-            write!(f, "{}/\n", name).expect("invalid folder");
-            let _ = fc.fmt(f);
-        }
-        if self.files.len() > 0 {
-            for file in &self.files {
-                write!(f, "-{}\n", file).expect("invalid filename");
             }
         }
 

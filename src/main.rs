@@ -60,6 +60,7 @@ fn main() -> Result<()> {
         .prompt()?;
     }
 
+    // TODO: make it handle ctrlc properly
     camera.move_all_files("/", output_path, delete_confirmed)?;
 
     Ok(())

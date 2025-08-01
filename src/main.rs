@@ -1,8 +1,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use log::trace;
-use std::io::prelude::*;
-use std::io::{self};
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -10,6 +9,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 struct Cli {
     #[command(flatten)]
     verbosity: clap_verbosity_flag::Verbosity,
+    output: String,
+
+    #[arg(
+        short = 'd',
+        long = "delete",
+        help = "Delete files from device after copy"
+    )]
+    delete: bool,
 }
 
 fn main() -> Result<()> {
@@ -24,9 +31,6 @@ fn main() -> Result<()> {
     env_logger::Builder::new()
         .filter_level(args.verbosity.into())
         .init();
-
-    let stdout = io::stdout();
-    let mut stdout_handle = io::BufWriter::new(stdout.lock());
 
     trace!("environment initialized");
 
@@ -45,24 +49,18 @@ fn main() -> Result<()> {
     trace!("selected camera summary:\n{}", camera.get_summary()?);
     trace!("selected port: {}", camera.get_port()?);
 
-    let folders = camera.get_folders("/")?;
+    let output_path = Path::new(&args.output);
 
-    writeln!(stdout_handle, "{}", folders)?;
-    stdout_handle.flush()?;
+    let mut delete_confirmed = false;
+    if args.delete {
+        delete_confirmed = inquire::Confirm::new(
+            "Delete flag is enabled, this will delete files on device after copying.",
+        )
+        .with_default(false)
+        .prompt()?;
+    }
 
-    // TODO: add progress bar back in
-    // TODO: check https://github.com/maxicarlos08/gphoto2-rs/blob/main/examples/camera_progress.rs
-    // for progress with camera interactions
+    camera.move_all_files("/", output_path, delete_confirmed)?;
 
-    // let pb = indicatif::ProgressBar::new(100);
-    // for i in 0..100 {
-    //     if !running.load(Ordering::SeqCst) {
-    //         break;
-    //     }
-    //     pb.println(format!("[+] finished #{}", i));
-    //     pb.inc(1);
-    //     sleep(std::time::Duration::from_millis(5));
-    // }
-    // pb.finish_with_message("done");
     Ok(())
 }

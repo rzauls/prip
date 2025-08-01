@@ -1,8 +1,9 @@
 use gphoto2::Error;
-use gphoto2::file;
 use gphoto2::list;
+use log::info;
 use log::trace;
 use std::collections::HashMap;
+use std::path::Path;
 
 // TODO: wrap the gphoto2 errors with our own to detach from gphoto2 platform dependencies
 
@@ -65,7 +66,12 @@ impl Camera {
         Ok(self.inner.summary()?)
     }
 
-    pub fn get_folders(&self, root_name: &str) -> Result<FolderContent, Error> {
+    pub fn move_all_files(
+        &self,
+        root_name: &str,
+        output_dir_root: &Path,
+        delete_after_copy: bool,
+    ) -> Result<(), Error> {
         let fs = self.inner.fs();
         let folders_iter = fs.list_folders(root_name).wait()?;
         let mut folders = HashMap::with_capacity(folders_iter.len());
@@ -73,32 +79,28 @@ impl Camera {
         for folder in folders_iter {
             let folder_full_name =
                 format!("{}/{folder}", if root_name == "/" { "" } else { root_name });
-            folders.insert(folder, self.get_folders(&folder_full_name)?);
+            folders.insert(
+                folder,
+                self.move_all_files(&folder_full_name, output_dir_root, delete_after_copy)?,
+            );
         }
 
-        let files = fs.list_files(root_name).wait()?.collect();
+        for file in fs.list_files(root_name).wait()? {
+            let output_dir = output_dir_root.join(&file);
+            info!(
+                "downloading `{}` from `{}` to `{}`",
+                &file,
+                root_name,
+                output_dir.to_str().expect("invalid output path")
+            );
+            fs.download_to(root_name, &file, &output_dir).wait()?;
+            if delete_after_copy {
+                fs.delete_file(root_name, &file).wait()?;
+                info!("deleted `{}` from `{}`", &file, root_name);
+            }
+        }
 
-        Ok(FolderContent {
-            files: files,
-            folders: folders,
-        })
-    }
-
-    pub fn get_file(&self, folder: &str, file: &str) -> Result<File, Error> {
-        let fs = self.inner.fs();
-        let file = fs.download(folder, file).wait()?;
-
-        Ok(File { inner: file })
-    }
-}
-
-pub struct File {
-    inner: file::CameraFile,
-}
-
-impl File {
-    pub fn get_filename(&self) -> String {
-        self.inner.name()
+        Ok(())
     }
 }
 

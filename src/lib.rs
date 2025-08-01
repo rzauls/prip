@@ -5,7 +5,8 @@ use log::trace;
 use std::collections::HashMap;
 use std::path::Path;
 
-// TODO: wrap the gphoto2 errors with our own to detach from gphoto2 platform dependencies
+// TODO:  wrap the gphoto2 errors with our own to detach from gphoto2 platform dependencies
+// TODO:  add progress counter without having to use INFO verbosity level
 
 pub struct Context {
     inner: gphoto2::Context,
@@ -85,7 +86,6 @@ impl Camera {
             );
         }
 
-        // add progress counter without having to use INFO verbosity level
         for file in fs.list_files(root_name).wait()? {
             let output_dir = output_dir_root.join(&file);
             info!(

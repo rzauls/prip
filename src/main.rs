@@ -9,6 +9,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 struct Cli {
     #[command(flatten)]
     verbosity: clap_verbosity_flag::Verbosity,
+
+    #[arg(short = 'o', long = "output", help = "Output directory path")]
     output: String,
 
     #[arg(
@@ -38,13 +40,17 @@ fn main() -> Result<()> {
 
     let cameras = ctx
         .list_cameras()
-        .with_context(|| format!("could not list attached camera devices"))?;
+        .with_context(|| format!("Could not list attached camera devices"))?;
+
+    if cameras.is_empty() {
+        anyhow::bail!("No cameras found");
+    }
 
     let selected_camera_descriptor = inquire::Select::new("Choose a camera:", cameras).prompt()?;
 
     let camera = ctx
         .get_camera(selected_camera_descriptor)
-        .with_context(|| format!("could not fetch the selected camera"))?;
+        .with_context(|| format!("Could not fetch the selected camera"))?;
 
     trace!("selected camera summary:\n{}", camera.get_summary()?);
     trace!("selected port: {}", camera.get_port()?);
@@ -58,6 +64,10 @@ fn main() -> Result<()> {
         )
         .with_default(false)
         .prompt()?;
+
+        if !delete_confirmed {
+            anyhow::bail!("No action performed, since delete flag was enabled, but not confirmed")
+        }
     }
 
     // TODO: make it handle ctrlc properly

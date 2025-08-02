@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
 use log::trace;
 use std::path::Path;
 use std::sync::Arc;
@@ -70,8 +71,51 @@ fn main() -> Result<()> {
         }
     }
 
+    let show_progress = match args.verbosity.log_level() {
+        Some(log::Level::Info) | Some(log::Level::Debug) | Some(log::Level::Trace) => false,
+        _ => true,
+    };
+
+    let file_count = if show_progress {
+        Some(camera.count_files("/")?)
+    } else {
+        None
+    };
+
+    let pb = if show_progress && file_count.is_some() {
+        let total_files = file_count.as_ref().unwrap().total_files;
+        let progress_bar = if total_files > 0 {
+            let progress_bar = ProgressBar::new(total_files);
+            progress_bar.set_style(
+                ProgressStyle::default_bar()
+                    .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} files ({percent}%)")
+                    .expect("Invalid progress bar template")
+                    .progress_chars("█▉▊▋▌▍▎▏  ")
+            );
+            progress_bar
+        } else {
+            // do nothing if there are no files to process
+            ProgressBar::hidden()
+        };
+
+        progress_bar
+    } else {
+        ProgressBar::hidden()
+    };
+
+    let progress_callback = {
+        let pb_clone = pb.clone();
+        move |current: u64, _total: u64| {
+            pb_clone.set_position(current);
+        }
+    };
+
     // TODO: make it handle ctrlc properly
-    camera.move_all_files("/", output_path, delete_confirmed)?;
+    let result =
+        camera.move_all_files_with_callback("/", output_path, delete_confirmed, progress_callback);
+
+    pb.finish_with_message("File transfer completed!");
+    result?;
 
     Ok(())
 }

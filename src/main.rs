@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Parser)]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 struct Cli {
     #[command(flatten)]
     verbosity: clap_verbosity_flag::Verbosity,

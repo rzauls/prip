@@ -15,6 +15,7 @@ Options:
   -o, --output <OUTPUT>  Output directory path
   -d, --delete           Delete files from device after copy
   -h, --help             Print help
+  -V, --version          Print version
 ```
 
 
